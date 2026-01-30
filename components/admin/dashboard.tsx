@@ -7,6 +7,7 @@ import { ProductManagement } from "@/components/admin/product-management"
 import { EstimateManagement } from "@/components/admin/estimate-management"
 import { DashboardHome } from "@/components/admin/dashboard-home"
 import { Button } from "@/components/ui/button"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { LogOut } from "lucide-react"
 
 interface AdminDashboardProps {
@@ -42,15 +43,32 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">B2B Admin Panel</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage users, products, and estimates</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onLogout}
-            className="flex items-center gap-2 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 bg-transparent"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 bg-transparent"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to logout? You will need to login again to access the admin panel.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onLogout} className="bg-red-600 hover:bg-red-700">
+                  Logout
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Main Content */}

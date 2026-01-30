@@ -8,13 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Lock } from "lucide-react"
+import { authApi } from "@/lib/auth"
+import { toast } from "sonner"
+import { loginSchema } from "@/lib/validations"
 
 interface LoginPageProps {
   onLoginSuccess: () => void
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-  const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -24,14 +27,46 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setError("")
     setIsLoading(true)
 
-    // Demo authentication
-    if (email === "admin@example.com" && password === "admin123") {
-      onLoginSuccess()
-    } else {
-      setError("Invalid email or password. Demo: admin@example.com / admin123")
+    // Client-side validation
+    const validationResult = loginSchema.safeParse({ username, password })
+    
+    if (!validationResult.success) {
+      const errorMessage = validationResult.error.errors[0]?.message || 'Validation failed'
+      setError(errorMessage)
+      toast.error(errorMessage)
+      setIsLoading(false)
+      return
     }
 
-    setIsLoading(false)
+    try {
+      console.log('Attempting login with:', { username, password: '***' })
+      const response = await authApi.login({ username, password })
+      console.log('Login response:', response)
+      
+      if (response.success === true) {
+        console.log('Login successful, redirecting to dashboard')
+        // Handle both response formats - token can be at root or in data
+        const token = response.token || response.data?.token
+        if (token) {
+          localStorage.setItem('token', token)
+        }
+        onLoginSuccess()
+      } else {
+        console.log('Login failed:', response)
+        const errorMsg = response.error || response.message || 'Invalid username or password'
+        setError(errorMsg)
+        toast.error(errorMsg)
+        // Don't call onLoginSuccess() - stay on login page
+      }
+    } catch (err: any) {
+      console.error('Login error caught:', err)
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Invalid username or password'
+      setError(errorMessage)
+      toast.error(errorMessage)
+      // Don't call onLoginSuccess() - stay on login page
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -56,12 +91,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300">Email</label>
+              <label className="text-sm font-medium text-slate-300">Username</label>
               <Input
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
                 disabled={isLoading}
               />

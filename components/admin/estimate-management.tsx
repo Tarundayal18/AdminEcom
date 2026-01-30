@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -15,39 +15,40 @@ import {
 } from "@/components/ui/dialog"
 import { Mail, Eye, CheckCircle } from "lucide-react"
 import { ConfirmationDialog } from "../ui/confirmation-dialog"
+import { toast } from "sonner"
+import { api } from "@/lib/api"
+
+interface EstimateItem {
+  productId: {
+    _id: string
+    name: string
+    category: string
+    price: number
+  }
+  quantity: number
+  price: number
+  _id: string
+}
 
 interface Estimate {
-  id: string
-  company: string
-  products: string
-  quantity: number
-  total: number
-  date: string
+  _id: string
+  userId: number | {
+    _id: string
+    companyName: string
+    contactPerson: string
+    email: string
+    phone: string
+  }
+  items: EstimateItem[]
   status: "new" | "sent" | "closed"
+  createdAt: string
+  __v: number
 }
 
 export function EstimateManagement() {
-  const [estimates, setEstimates] = useState<Estimate[]>([
-    {
-      id: "1",
-      company: "Tech Corp",
-      products: "Professional License, Support",
-      quantity: 5,
-      total: 2495,
-      date: "2024-01-15",
-      status: "new",
-    },
-    {
-      id: "2",
-      company: "Global Solutions",
-      products: "Enterprise Package",
-      quantity: 2,
-      total: 1998,
-      date: "2024-01-14",
-      status: "sent",
-    },
-  ])
-
+  const [estimates, setEstimates] = useState<Estimate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedEstimate, setSelectedEstimate] = useState<Estimate | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
     type: "send" | "close" | null
@@ -56,6 +57,55 @@ export function EstimateManagement() {
     open: false,
     type: null,
   })
+
+  // Fetch estimates from API
+  const fetchEstimates = async () => {
+    try {
+      setLoading(true)
+      console.log('Fetching estimates from:', 'http://localhost:5001/api/v1/estimate/admin/all')
+      const response = await api.get('/estimate/admin/all')
+      console.log('Estimates response:', response.data)
+      
+      if (response.data.success) {
+        console.log('Estimates data:', response.data.data)
+        setEstimates(response.data.data)
+      } else {
+        toast.error('Failed to fetch estimates')
+      }
+    } catch (error: any) {
+      console.error('Error fetching estimates:', error)
+      console.error('Error response:', error.response?.data)
+      toast.error('Failed to fetch estimates')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Fetch estimates on component mount
+  useEffect(() => {
+    fetchEstimates()
+  }, [])
+
+  // Calculate total for an estimate
+  const calculateTotal = (items: EstimateItem[]) => {
+    return items.reduce((total, item) => total + item.price, 0)
+  }
+
+  // Format user ID or company name
+  const formatUserId = (userId: number | any) => {
+    if (typeof userId === 'number') {
+      return `#${userId}`
+    }
+    if (typeof userId === 'object' && userId?.companyName) {
+      return userId.companyName
+    }
+    return 'Unknown User'
+  }
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString()
+  }
 
   const updateStatus = (id: string, status: "sent" | "closed") => {
     setConfirmDialog({
@@ -67,7 +117,7 @@ export function EstimateManagement() {
 
   const handleConfirmStatusUpdate = (newStatus: "sent" | "closed") => {
     if (confirmDialog.estimateId) {
-      setEstimates(estimates.map((e) => (e.id === confirmDialog.estimateId ? { ...e, status: newStatus } : e)))
+      setEstimates(estimates.map((e) => (e._id === confirmDialog.estimateId ? { ...e, status: newStatus } : e)))
     }
     setConfirmDialog({ open: false, type: null })
   }
@@ -98,106 +148,129 @@ export function EstimateManagement() {
           <CardDescription>View and manage customer quotation requests</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="dark:border-slate-800">
-                <TableHead>Company</TableHead>
-                <TableHead>Products</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Total Amount</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {estimates.map((estimate) => (
-                <TableRow key={estimate.id} className="dark:border-slate-800">
-                  <TableCell className="font-medium text-slate-900 dark:text-white">{estimate.company}</TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300 text-sm">{estimate.products}</TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">{estimate.quantity}</TableCell>
-                  <TableCell className="font-semibold text-slate-900 dark:text-white">
-                    ${estimate.total.toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300 text-sm">{estimate.date}</TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(estimate.status)}>
-                      {estimate.status.charAt(0).toUpperCase() + estimate.status.slice(1)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
+          {loading ? (
+            <div className="text-center py-8">
+              <p className="text-slate-600 dark:text-slate-400">Loading estimates...</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="dark:border-slate-800">
+                  <TableHead>User ID</TableHead>
+                  <TableHead>Items</TableHead>
+                  <TableHead>Total Amount</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {estimates.map((estimate) => (
+                  <TableRow key={estimate._id} className="dark:border-slate-800">
+                    <TableCell className="font-medium text-slate-900 dark:text-white">
+                      {formatUserId(estimate.userId)}
+                    </TableCell>
+                    <TableCell className="text-slate-600 dark:text-slate-300 text-sm">
+                      {estimate.items.length} item{estimate.items.length !== 1 ? 's' : ''}
+                    </TableCell>
+                    <TableCell className="font-semibold text-slate-900 dark:text-white">
+                      ${calculateTotal(estimate.items).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-slate-600 dark:text-slate-300 text-sm">
+                      {formatDate(estimate.createdAt)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(estimate.status)}>
+                        {estimate.status.charAt(0).toUpperCase() + estimate.status.slice(1)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedEstimate(estimate)}
+                              className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="dark:bg-slate-900 dark:border-slate-800 max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Estimate Details</DialogTitle>
+                              <DialogDescription>View full estimate information</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-sm text-slate-500 dark:text-slate-400">User/Company</p>
+                                  <p className="font-medium">{formatUserId(estimate.userId)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-slate-500 dark:text-slate-400">Date</p>
+                                  <p className="font-medium">{formatDate(estimate.createdAt)}</p>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Items</p>
+                                <div className="space-y-2">
+                                  {estimate.items.map((item) => (
+                                    <div key={item._id} className="flex justify-between items-center p-2 border rounded dark:border-slate-700">
+                                      <div>
+                                        <p className="font-medium">
+                                          {item.productId?.name || 'Unknown Product'}
+                                        </p>
+                                        <p className="text-sm text-slate-500">
+                                          {item.productId?.category || 'Unknown Category'} • Qty: {item.quantity}
+                                        </p>
+                                      </div>
+                                      <p className="font-semibold">${item.price.toLocaleString()}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="border-t pt-4">
+                                <div className="flex justify-between items-center">
+                                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Amount</p>
+                                  <p className="font-bold text-lg text-blue-600">
+                                    ${calculateTotal(estimate.items).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        {estimate.status === "new" && (
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            onClick={() => updateStatus(estimate._id, "sent")}
+                            className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                            title="Send Estimate"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Mail className="w-4 h-4" />
                           </Button>
-                        </DialogTrigger>
-                        <DialogContent className="dark:bg-slate-900 dark:border-slate-800">
-                          <DialogHeader>
-                            <DialogTitle>Estimate Details</DialogTitle>
-                            <DialogDescription>View full estimate information</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Company</p>
-                                <p className="font-medium">{estimate.company}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Date</p>
-                                <p className="font-medium">{estimate.date}</p>
-                              </div>
-                            </div>
-                            <div>
-                              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Products</p>
-                              <p className="font-medium">{estimate.products}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Quantity</p>
-                                <p className="font-medium">{estimate.quantity}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Total</p>
-                                <p className="font-bold text-lg text-blue-600">${estimate.total.toLocaleString()}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      {estimate.status === "new" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => updateStatus(estimate.id, "sent")}
-                          className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                          title="Send Estimate"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {estimate.status === "sent" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => updateStatus(estimate.id, "closed")}
-                          className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                          title="Mark as Closed"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        )}
+                        {estimate.status === "sent" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => updateStatus(estimate._id, "closed")}
+                            className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            title="Mark as Closed"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
