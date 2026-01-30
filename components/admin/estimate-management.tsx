@@ -62,7 +62,7 @@ export function EstimateManagement() {
   const fetchEstimates = async () => {
     try {
       setLoading(true)
-      console.log('Fetching estimates from:', 'http://localhost:5001/api/v1/estimate/admin/all')
+      console.log('Fetching estimates from:', 'https://lot-ecom-backend.onrender.com/api/v1/estimate/admin/all')
       const response = await api.get('/estimate/admin/all')
       console.log('Estimates response:', response.data)
       

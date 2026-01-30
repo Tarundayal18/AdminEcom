@@ -105,7 +105,7 @@ export function UsersManagement() {
       
       // Manual test - create request exactly as backend expects
       const token = localStorage.getItem('token')
-      const fullUrl = `http://localhost:5001/api/v1/admin/users/${id}`
+      const fullUrl = `https://lot-ecom-backend.onrender.com/api/v1/admin/users/${id}`
       
       console.log(`=== MANUAL REQUEST TEST ===`)
       console.log('🆔 User ID being updated:', id)
@@ -172,7 +172,7 @@ export function UsersManagement() {
       setActionLoading(id)
       
       const token = localStorage.getItem('token')
-      const fullUrl = `http://localhost:5001/api/v1/admin/users/disable/${id}`
+      const fullUrl = `https://lot-ecom-backend.onrender.com/api/v1/admin/users/disable/${id}`
       
       console.log(`=== DISABLE USER REQUEST ===`)
       console.log('🆔 User ID to disable:', id)
