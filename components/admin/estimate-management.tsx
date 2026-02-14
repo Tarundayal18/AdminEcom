@@ -13,10 +13,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Mail, Eye, CheckCircle } from "lucide-react"
+import { Mail, Eye, CheckCircle, Download } from "lucide-react"
 import { ConfirmationDialog } from "../ui/confirmation-dialog"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import * as XLSX from 'xlsx'
 
 interface EstimateItem {
   productId: {
@@ -120,6 +121,56 @@ export function EstimateManagement() {
       setEstimates(estimates.map((e) => (e._id === confirmDialog.estimateId ? { ...e, status: newStatus } : e)))
     }
     setConfirmDialog({ open: false, type: null })
+  }
+
+  // Export estimate to Excel
+  const exportToExcel = (estimate: Estimate) => {
+    try {
+      // Prepare data for Excel
+      const excelData = estimate.items.map((item) => ({
+        'Product Name': item.productId?.name || 'Unknown Product',
+        'Category': item.productId?.category || 'Unknown Category',
+        'Quantity': item.quantity,
+        'Unit Price': item.productId?.price || 0,
+        'Total Price': item.price,
+      }))
+
+      // Add total row
+      excelData.push({
+        'Product Name': 'TOTAL',
+        'Category': '' as any,
+        'Quantity': null as any,
+        'Unit Price': null as any,
+        'Total Price': calculateTotal(estimate.items),
+      })
+
+      // Create workbook
+      const ws = XLSX.utils.json_to_sheet(excelData)
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Estimate')
+
+      // Add header info
+      const headerInfo = [
+        [`Estimate ID: ${estimate._id}`],
+        [`Customer: ${formatUserId(estimate.userId)}`],
+        [`Date: ${formatDate(estimate.createdAt)}`],
+        [`Status: ${estimate.status.toUpperCase()}`],
+        [],
+      ]
+
+      // Insert header info at the top
+      XLSX.utils.sheet_add_aoa(ws, headerInfo, { origin: 'A1' })
+
+      // Generate filename
+      const fileName = `Estimate_${estimate._id}_${formatUserId(estimate.userId).replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+
+      // Download file
+      XLSX.writeFile(wb, fileName)
+      toast.success('Estimate exported to Excel successfully')
+    } catch (error) {
+      console.error('Error exporting to Excel:', error)
+      toast.error('Failed to export estimate to Excel')
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -239,6 +290,15 @@ export function EstimateManagement() {
                                   </p>
                                 </div>
                               </div>
+                              <div className="flex justify-end pt-4">
+                                <Button
+                                  onClick={() => exportToExcel(estimate)}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Export to Excel
+                                </Button>
+                              </div>
                             </div>
                           </DialogContent>
                         </Dialog>
@@ -246,9 +306,9 @@ export function EstimateManagement() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => updateStatus(estimate._id, "sent")}
+                            onClick={() => exportToExcel(estimate)}
                             className="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
-                            title="Send Estimate"
+                            title="Export to Excel"
                           >
                             <Mail className="w-4 h-4" />
                           </Button>

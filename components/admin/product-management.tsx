@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Plus, Edit, Trash2, ToggleLeft as Toggle, Eye, EyeOff } from "lucide-react"
+import { Plus, Edit, Trash2, ToggleLeft as Toggle, Eye, EyeOff, Upload, X } from "lucide-react"
 import { ConfirmationDialog } from "../ui/confirmation-dialog"
 import { api } from "@/lib/api"
 import { toast } from "sonner"
@@ -34,6 +34,7 @@ interface Product {
   quantity: number
   description?: string
   status: "active" | "inactive"
+  image?: string
 }
 
 export function ProductManagement() {
@@ -52,6 +53,8 @@ export function ProductManagement() {
     quantity: "",
     description: ""
   })
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
 
@@ -60,14 +63,23 @@ export function ProductManagement() {
     try {
       setLoading(true)
       const response = await api.get('/products')
-      const productsData = response.data.data.map((product: any) => ({
-        id: product._id,
-        name: product.name,
-        category: product.category,
-        price: product.price,
-        quantity: product.quantity,
-        status: product.isActive ? "active" : "inactive" as "active" | "inactive"
-      }))
+      console.log('=== PRODUCTS API RESPONSE ===')
+      console.log('Response data:', response.data)
+      console.log('Products array:', response.data.data)
+      console.log('============================')
+      
+      const productsData = response.data.data.map((product: any) => {
+        console.log('Processing product:', product)
+        return {
+          id: product._id,
+          name: product.name,
+          category: product.category,
+          price: product.price,
+          quantity: product.quantity,
+          status: product.isActive ? "active" : "inactive" as "active" | "inactive",
+          image: product.mainImage?.url || product.image || product.imageUrl || null
+        }
+      })
       setProducts(productsData)
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -87,7 +99,8 @@ export function ProductManagement() {
         category: product.category,
         price: product.price,
         quantity: product.quantity,
-        status: "inactive" as "active" | "inactive"
+        status: "inactive" as "active" | "inactive",
+        image: product.mainImage?.url || product.image || product.imageUrl || null
       }))
       setDeactivatedProducts(deactivatedData)
     } catch (error) {
@@ -125,6 +138,12 @@ export function ProductManagement() {
   }
 
   const handleConfirmAction = async () => {
+    console.log('=== handleConfirmAction START ===')
+    console.log('confirmDialog.type:', confirmDialog.type)
+    console.log('editingId:', editingId)
+    console.log('formData:', formData)
+    console.log('selectedImage:', selectedImage)
+    
     if (confirmDialog.type === "add" || confirmDialog.type === "edit") {
       try {
         if (confirmDialog.type === "edit" && editingId) {
@@ -150,23 +169,87 @@ export function ProductManagement() {
           toast.success("Product updated successfully")
         } else {
           // Add new product
-          const newProduct = {
-            name: formData.name,
-            category: formData.category,
-            price: Number.parseFloat(formData.price),
-            quantity: Number.parseInt(formData.quantity),
+          console.log('=== FORM DATA VALIDATION ===')
+          console.log('name:', formData.name)
+          console.log('category:', formData.category)
+          console.log('price:', formData.price)
+          console.log('quantity:', formData.quantity)
+          console.log('selectedImage:', selectedImage)
+          
+          // Validate all required fields
+          if (!formData.name || !formData.name.trim()) {
+            toast.error('Product name is required')
+            return
+          }
+          if (!formData.category || !formData.category.trim()) {
+            toast.error('Category is required')
+            return
+          }
+          if (!formData.price || isNaN(Number.parseFloat(formData.price))) {
+            toast.error('Valid price is required')
+            return
+          }
+          if (!formData.quantity || isNaN(Number.parseInt(formData.quantity))) {
+            toast.error('Valid quantity is required')
+            return
           }
           
-          const response = await api.post('/admin/products', newProduct)
-          
-          const productWithId: Product = {
-            id: response.data._id || Date.now().toString(),
-            ...newProduct,
-            status: "active",
+          if (selectedImage) {
+            // Use FormData when image is present
+            const formDataToSend = new FormData()
+            formDataToSend.append('name', formData.name.trim())
+            formDataToSend.append('category', formData.category.trim())
+            formDataToSend.append('price', formData.price)
+            formDataToSend.append('quantity', formData.quantity)
+            formDataToSend.append('description', formData.description || '') // Added description field
+            formDataToSend.append('mainImage', selectedImage) // Changed to 'mainImage' to match Postman
+            
+            // Log FormData content for debugging
+            console.log('=== FORM DATA CONTENT ===')
+            for (let [key, value] of formDataToSend.entries()) {
+              console.log(key, value)
+            }
+            console.log('========================')
+            
+            const response = await api.post('/admin/products', formDataToSend, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            })
+            
+            const productWithId: Product = {
+              id: response.data._id || Date.now().toString(),
+              name: formData.name,
+              category: formData.category,
+              price: Number.parseFloat(formData.price),
+              quantity: Number.parseInt(formData.quantity),
+              status: "active",
+              image: response.data.mainImage?.url || response.data.image || null
+            }
+            
+            setProducts([...products, productWithId])
+            toast.success("Product added successfully with image")
+          } else {
+            // Use JSON when no image (original approach)
+            const newProduct = {
+              name: formData.name.trim(),
+              category: formData.category.trim(),
+              price: Number.parseFloat(formData.price),
+              quantity: Number.parseInt(formData.quantity),
+            }
+            
+            console.log('Sending JSON data:', newProduct)
+            const response = await api.post('/admin/products', newProduct)
+            
+            const productWithId: Product = {
+              id: response.data._id || Date.now().toString(),
+              ...newProduct,
+              status: "active",
+            }
+            
+            setProducts([...products, productWithId])
+            toast.success("Product added successfully")
           }
-          
-          setProducts([...products, productWithId])
-          toast.success("Product added successfully")
         }
         
         // Refresh appropriate list
@@ -183,6 +266,8 @@ export function ProductManagement() {
           quantity: "",
           description: ""
         })
+        setSelectedImage(null)
+        setImagePreview(null)
         setIsDialogOpen(false)
       } catch (error: any) {
         console.error('Error saving product:', error)
@@ -252,7 +337,26 @@ export function ProductManagement() {
       quantity: product.quantity.toString(),
       description: product.description || "",
     })
+    setImagePreview(product.image || null)
+    setSelectedImage(null)
     setIsDialogOpen(true)
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedImage(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeImage = () => {
+    setSelectedImage(null)
+    setImagePreview(null)
   }
 
   return (
@@ -297,6 +401,46 @@ export function ProductManagement() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full min-h-[80px] px-3 py-2 text-sm border border-gray-300 rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white resize-none"
                 />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Product Image</label>
+                <div className="mt-2">
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img 
+                        src={imagePreview} 
+                        alt="Product preview" 
+                        className="w-32 h-32 object-cover rounded-md border border-gray-300 dark:border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-md p-4">
+                      <label htmlFor="image-upload" className="cursor-pointer flex flex-col items-center">
+                        <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          Click to upload image
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                          PNG, JPG, GIF up to 10MB
+                        </span>
+                      </label>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="hidden"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium">Category</label>
@@ -397,6 +541,7 @@ export function ProductManagement() {
           <Table>
             <TableHeader>
               <TableRow className="dark:border-slate-800">
+                <TableHead>Image</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
@@ -408,6 +553,19 @@ export function ProductManagement() {
             <TableBody>
               {filteredProducts.map((product) => (
                 <TableRow key={product.id} className="dark:border-slate-800">
+                  <TableCell>
+                    {product.image ? (
+                      <img 
+                        src={product.image} 
+                        alt={product.name}
+                        className="w-12 h-12 object-cover rounded-md border border-gray-300 dark:border-slate-700"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 dark:bg-slate-700 rounded-md flex items-center justify-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">No img</span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="font-medium text-slate-900 dark:text-white">
                     <div className="font-semibold">{product.name}</div>
                   </TableCell>
