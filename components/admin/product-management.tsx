@@ -151,26 +151,67 @@ export function ProductManagement() {
       setIsSubmitting(true)
       try {
         if (confirmDialog.type === "edit" && editingId) {
-          // Update existing product - only send price, quantity, description
-          const updatedProduct = {
-            price: Number.parseFloat(formData.price),
-            quantity: Number.parseInt(formData.quantity),
-            description: formData.description,
+          // Update existing product - check if image is being updated
+          if (selectedImage) {
+            // Use FormData when image is being updated
+            const formDataToSend = new FormData()
+            formDataToSend.append('price', formData.price)
+            formDataToSend.append('quantity', formData.quantity)
+            formDataToSend.append('description', formData.description || '')
+            formDataToSend.append('mainImage', selectedImage)
+            
+            console.log('=== EDITING WITH IMAGE ===')
+            console.log('formDataToSend:', formDataToSend)
+            for (let [key, value] of formDataToSend.entries()) {
+              console.log(key, value)
+            }
+            console.log('==========================')
+            
+            const response = await api.put(`/admin/products/${editingId}`, formDataToSend, {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            })
+            
+            console.log('Update with image response:', response.data)
+            
+            setProducts(
+              products.map((p) =>
+                p.id === editingId
+                  ? { 
+                      ...p, 
+                      price: Number.parseFloat(formData.price),
+                      quantity: Number.parseInt(formData.quantity),
+                      description: formData.description,
+                      image: response.data.mainImage?.url || response.data.image || p.image
+                    }
+                  : p,
+              ),
+            )
+            toast.success("Product updated successfully with new image")
+          } else {
+            // Update without image - only send price, quantity, description
+            const updatedProduct = {
+              price: Number.parseFloat(formData.price),
+              quantity: Number.parseInt(formData.quantity),
+              description: formData.description,
+            }
+            
+            console.log('Updating product without image:', editingId, updatedProduct)
+            const response = await api.put(`/admin/products/${editingId}`, updatedProduct)
+            console.log('Update response:', response.data)
+            
+            setProducts(
+              products.map((p) =>
+                p.id === editingId
+                  ? { ...p, ...updatedProduct }
+                  : p,
+              ),
+            )
+            toast.success("Product updated successfully")
           }
           
-          console.log('Updating product:', editingId, updatedProduct)
-          const response = await api.put(`/admin/products/${editingId}`, updatedProduct)
-          console.log('Update response:', response.data)
-          
-          setProducts(
-            products.map((p) =>
-              p.id === editingId
-                ? { ...p, ...updatedProduct }
-                : p,
-            ),
-          )
           setEditingId(null)
-          toast.success("Product updated successfully")
         } else {
           // Add new product
           console.log('=== FORM DATA VALIDATION ===')
