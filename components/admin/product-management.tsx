@@ -57,6 +57,7 @@ export function ProductManagement() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -76,6 +77,7 @@ export function ProductManagement() {
           category: product.category,
           price: product.price,
           quantity: product.quantity,
+          description: product.description || "",
           status: product.isActive ? "active" : "inactive" as "active" | "inactive",
           image: product.mainImage?.url || product.image || product.imageUrl || null
         }
@@ -99,6 +101,7 @@ export function ProductManagement() {
         category: product.category,
         price: product.price,
         quantity: product.quantity,
+        description: product.description || "",
         status: "inactive" as "active" | "inactive",
         image: product.mainImage?.url || product.image || product.imageUrl || null
       }))
@@ -145,6 +148,7 @@ export function ProductManagement() {
     console.log('selectedImage:', selectedImage)
     
     if (confirmDialog.type === "add" || confirmDialog.type === "edit") {
+      setIsSubmitting(true)
       try {
         if (confirmDialog.type === "edit" && editingId) {
           // Update existing product - only send price, quantity, description
@@ -206,6 +210,8 @@ export function ProductManagement() {
             
             // Log FormData content for debugging
             console.log('=== FORM DATA CONTENT ===')
+            console.log('formData.description:', formData.description)
+            console.log('description being sent:', formData.description || '')
             for (let [key, value] of formDataToSend.entries()) {
               console.log(key, value)
             }
@@ -236,9 +242,15 @@ export function ProductManagement() {
               category: formData.category.trim(),
               price: Number.parseFloat(formData.price),
               quantity: Number.parseInt(formData.quantity),
+              description: formData.description || '', // Added description field
             }
             
-            console.log('Sending JSON data:', newProduct)
+            console.log('=== SENDING JSON DATA ===')
+            console.log('formData.description:', formData.description)
+            console.log('newProduct.description:', newProduct.description)
+            console.log('Complete newProduct:', newProduct)
+            console.log('========================')
+            
             const response = await api.post('/admin/products', newProduct)
             
             const productWithId: Product = {
@@ -259,21 +271,17 @@ export function ProductManagement() {
           fetchProducts()
         }
         
-        setFormData({ 
-          name: "", 
-          category: "",
-          price: "",
-          quantity: "",
-          description: ""
-        })
-        setSelectedImage(null)
-        setImagePreview(null)
+        toast.success(confirmDialog.type === "edit" ? "Product updated successfully" : "Product added successfully")
+        
+        // Close dialog after success
         setIsDialogOpen(false)
       } catch (error: any) {
         console.error('Error saving product:', error)
         console.error('Error response:', error.response?.data)
         console.error('Error status:', error.response?.status)
         toast.error(confirmDialog.type === "edit" ? "Failed to update product" : "Failed to add product")
+      } finally {
+        setIsSubmitting(false)
       }
     }
     setConfirmDialog({ open: false, type: null })
@@ -366,7 +374,35 @@ export function ProductManagement() {
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Product Management</h2>
           <p className="text-slate-600 dark:text-slate-400 mt-2">Add, edit, or manage products</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(open) => {
+          setIsDialogOpen(open)
+          if (!open) {
+            // Dialog close ho raha hai - form clear karo
+            setFormData({ 
+              name: "", 
+              category: "",
+              price: "",
+              quantity: "",
+              description: ""
+            })
+            setSelectedImage(null)
+            setImagePreview(null)
+            setEditingId(null)
+          } else {
+            // Dialog open ho raha hai - agar editingId nahi hai to form clear karo
+            if (!editingId) {
+              setFormData({ 
+                name: "", 
+                category: "",
+                price: "",
+                quantity: "",
+                description: ""
+              })
+              setSelectedImage(null)
+              setImagePreview(null)
+            }
+          }
+        }}>
           {!showDeactivated && (
             <DialogTrigger asChild>
               <Button className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white">
@@ -485,8 +521,17 @@ export function ProductManagement() {
                   required
                 />
               </div>
-              <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-cyan-600">
-                {editingId ? "Update Product" : "Add Product"}
+              <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-cyan-600" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    {editingId ? "Updating..." : "Adding..."}
+                  </div>
+                ) : (
+                  <>
+                    {editingId ? "Update Product" : "Add Product"}
+                  </>
+                )}
               </Button>
             </form>
           </DialogContent>
