@@ -33,12 +33,24 @@ interface Product {
   price: number
   quantity: number
   description?: string
+  productCode?: string
   status: "active" | "inactive"
   image?: string
 }
 
 export function ProductManagement() {
-  const categories = ['electronics', 'clothing', 'food', 'books', 'home', 'sports', 'other']
+  const [categories, setCategories] = useState<string[]>([
+    "electronics",
+    "clothing",
+    "food",
+    "furniture",
+    "books",
+    "toys",
+    "sports",
+    "beauty",
+    "automotive",
+    "health"
+  ])
   
   const [products, setProducts] = useState<Product[]>([])
   const [deactivatedProducts, setDeactivatedProducts] = useState<Product[]>([])
@@ -51,13 +63,16 @@ export function ProductManagement() {
     category: "",
     price: "",
     quantity: "",
-    description: ""
+    description: "",
+    productCode: ""
   })
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [newCategory, setNewCategory] = useState("")
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -78,6 +93,7 @@ export function ProductManagement() {
           price: product.price,
           quantity: product.quantity,
           description: product.description || "",
+          productCode: product.productCode || "",
           status: product.isActive ? "active" : "inactive" as "active" | "inactive",
           image: product.mainImage?.url || product.image || product.imageUrl || null
         }
@@ -102,6 +118,7 @@ export function ProductManagement() {
         price: product.price,
         quantity: product.quantity,
         description: product.description || "",
+        productCode: product.productCode || "",
         status: "inactive" as "active" | "inactive",
         image: product.mainImage?.url || product.image || product.imageUrl || null
       }))
@@ -158,6 +175,8 @@ export function ProductManagement() {
             formDataToSend.append('price', formData.price)
             formDataToSend.append('quantity', formData.quantity)
             formDataToSend.append('description', formData.description || '')
+            formDataToSend.append('category', formData.category.trim()) // Added category update
+            formDataToSend.append('productCode', formData.productCode.trim()) // Added productCode field
             formDataToSend.append('mainImage', selectedImage)
             
             console.log('=== EDITING WITH IMAGE ===')
@@ -183,6 +202,8 @@ export function ProductManagement() {
                       price: Number.parseFloat(formData.price),
                       quantity: Number.parseInt(formData.quantity),
                       description: formData.description,
+                      category: formData.category.trim(), // Added category update
+                      productCode: formData.productCode.trim(), // Added productCode field
                       image: response.data.mainImage?.url || response.data.image || p.image
                     }
                   : p,
@@ -190,11 +211,13 @@ export function ProductManagement() {
             )
             toast.success("Product updated successfully with new image")
           } else {
-            // Update without image - only send price, quantity, description
+            // Update without image - only send price, quantity, description, category, productCode
             const updatedProduct = {
               price: Number.parseFloat(formData.price),
               quantity: Number.parseInt(formData.quantity),
               description: formData.description,
+              category: formData.category.trim(), // Added category update
+              productCode: formData.productCode.trim(), // Added productCode field
             }
             
             console.log('Updating product without image:', editingId, updatedProduct)
@@ -246,8 +269,9 @@ export function ProductManagement() {
             formDataToSend.append('category', formData.category.trim())
             formDataToSend.append('price', formData.price)
             formDataToSend.append('quantity', formData.quantity)
-            formDataToSend.append('description', formData.description || '') // Added description field
-            formDataToSend.append('mainImage', selectedImage) // Changed to 'mainImage' to match Postman
+            formDataToSend.append('description', formData.description || '')
+            formDataToSend.append('productCode', formData.productCode.trim()) // Added productCode field
+            formDataToSend.append('mainImage', selectedImage)
             
             // Log FormData content for debugging
             console.log('=== FORM DATA CONTENT ===')
@@ -283,7 +307,8 @@ export function ProductManagement() {
               category: formData.category.trim(),
               price: Number.parseFloat(formData.price),
               quantity: Number.parseInt(formData.quantity),
-              description: formData.description || '', // Added description field
+              description: formData.description || '',
+              productCode: formData.productCode.trim(), // Added productCode field
             }
             
             console.log('=== SENDING JSON DATA ===')
@@ -385,6 +410,7 @@ export function ProductManagement() {
       price: product.price.toString(),
       quantity: product.quantity.toString(),
       description: product.description || "",
+      productCode: product.productCode || ""
     })
     setImagePreview(product.image || null)
     setSelectedImage(null)
@@ -408,6 +434,33 @@ export function ProductManagement() {
     setImagePreview(null)
   }
 
+  const handleAddNewCategory = () => {
+    if (newCategory.trim()) {
+      const trimmedCategory = newCategory.trim().toLowerCase()
+      if (!categories.includes(trimmedCategory)) {
+        setCategories([...categories, trimmedCategory])
+        setFormData({ ...formData, category: trimmedCategory })
+        setNewCategory("")
+        setShowNewCategoryInput(false)
+        toast.success("New category added successfully")
+      } else {
+        toast.error("Category already exists")
+      }
+    } else {
+      toast.error("Please enter a category name")
+    }
+  }
+
+  const handleCategoryChange = (value: string) => {
+    if (value === "add-new") {
+      setShowNewCategoryInput(true)
+    } else {
+      setFormData({ ...formData, category: value })
+      setShowNewCategoryInput(false)
+      setNewCategory("")
+    }
+  }
+
   return (
     <div className="p-6 md:p-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -424,7 +477,8 @@ export function ProductManagement() {
               category: "",
               price: "",
               quantity: "",
-              description: ""
+              description: "",
+              productCode: ""
             })
             setSelectedImage(null)
             setImagePreview(null)
@@ -437,7 +491,8 @@ export function ProductManagement() {
                 category: "",
                 price: "",
                 quantity: "",
-                description: ""
+                description: "",
+                productCode: ""
               })
               setSelectedImage(null)
               setImagePreview(null)
@@ -477,6 +532,15 @@ export function ProductManagement() {
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full min-h-[80px] px-3 py-2 text-sm border border-gray-300 rounded-md dark:bg-slate-800 dark:border-slate-700 dark:text-white resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Product productCode</label>
+                <Input
+                  placeholder="Enter product productCode"
+                  value={formData.productCode}
+                  onChange={(e) => setFormData({ ...formData, productCode: e.target.value })}
+                  className="dark:bg-slate-800 dark:border-slate-700"
                 />
               </div>
               <div>
@@ -521,22 +585,59 @@ export function ProductManagement() {
               </div>
               <div>
                 <label className="text-sm font-medium">Category</label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  required
-                >
-                  <SelectTrigger className="dark:bg-slate-800 dark:border-slate-700">
-                    <SelectValue placeholder="Select a category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                {showNewCategoryInput ? (
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      placeholder="Enter new category"
+                      value={newCategory}
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      className="dark:bg-slate-800 dark:border-slate-700"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddNewCategory()
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddNewCategory}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setShowNewCategoryInput(false)
+                        setNewCategory("")
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.category}
+                    onValueChange={handleCategoryChange}
+                    required
+                  >
+                    <SelectTrigger className="dark:bg-slate-800 dark:border-slate-700">
+                      <SelectValue placeholder="Select a category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="add-new" className="text-green-600 font-medium">
+                        <Plus className="w-4 h-4 inline mr-2" />
+                        Add New Category
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium">Price ($)</label>
@@ -630,6 +731,7 @@ export function ProductManagement() {
                 <TableHead>Image</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Code</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Quantity</TableHead>
                 <TableHead>Status</TableHead>
@@ -658,6 +760,11 @@ export function ProductManagement() {
                   <TableCell className="text-slate-600 dark:text-slate-300">
                     <Badge variant="outline" className="dark:border-slate-600">
                       {product.category}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-slate-600 dark:text-slate-300">
+                    <Badge variant="outline" className="dark:border-slate-600">
+                      {product.productCode || "-"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-slate-600 dark:text-slate-300">${product.price.toFixed(2)}</TableCell>

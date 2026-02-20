@@ -3,7 +3,7 @@ import axios from 'axios';
 export const api = axios.create({
   baseURL: 'https://lot-ecom-backend.onrender.com/api/v1',
   // baseURL: 'http://localhost:5001/api/v1',
-  timeout: 10000,
+  timeout: 30000, // Increased from 10000 to 30000
   headers: {
     'Content-Type': 'application/json',
   },
