@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/admin/sidebar"
 import { UsersManagement } from "@/components/admin/users-management"
 import { ProductManagement } from "@/components/admin/product-management"
@@ -16,6 +16,20 @@ interface AdminDashboardProps {
 
 export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const [activeSection, setActiveSection] = useState("dashboard")
+
+  // Load active section from localStorage on component mount
+  useEffect(() => {
+    const savedSection = localStorage.getItem('adminActiveSection')
+    if (savedSection) {
+      setActiveSection(savedSection)
+    }
+  }, [])
+
+  // Save active section to localStorage whenever it changes
+  const handleSectionChange = (section: string) => {
+    setActiveSection(section)
+    localStorage.setItem('adminActiveSection', section)
+  }
 
   const renderSection = () => {
     switch (activeSection) {
@@ -34,7 +48,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      <Sidebar activeSection={activeSection} onSectionChange={handleSectionChange} />
 
       <div className="flex-1 flex flex-col">
         {/* Header */}

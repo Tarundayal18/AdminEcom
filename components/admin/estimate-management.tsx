@@ -95,7 +95,7 @@ export function EstimateManagement() {
   // Format user ID or company name
   const formatUserId = (userId: number | any) => {
     if (typeof userId === 'number') {
-      return `#${userId}`
+      return `#₹{userId}`
     }
     if (typeof userId === 'object' && userId?.companyName) {
       return userId.companyName
@@ -151,10 +151,10 @@ export function EstimateManagement() {
 
       // Add header info
       const headerInfo = [
-        [`Estimate ID: ${estimate._id}`],
-        [`Customer: ${formatUserId(estimate.userId)}`],
-        [`Date: ${formatDate(estimate.createdAt)}`],
-        [`Status: ${estimate.status.toUpperCase()}`],
+        [`Estimate ID: ₹{estimate._id}`],
+        [`Customer: ₹{formatUserId(estimate.userId)}`],
+        [`Date: ₹{formatDate(estimate.createdAt)}`],
+        [`Status: ₹{estimate.status.toUpperCase()}`],
         [],
       ]
 
@@ -162,7 +162,7 @@ export function EstimateManagement() {
       XLSX.utils.sheet_add_aoa(ws, headerInfo, { origin: 'A1' })
 
       // Generate filename
-      const fileName = `Estimate_${estimate._id}_${formatUserId(estimate.userId).replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`
+      const fileName = `Estimate_₹{estimate._id}_₹{formatUserId(estimate.userId).replace(/[^a-zA-Z0-9]/g, '_')}_₹{new Date().toISOString().split('T')[0]}.xlsx`
 
       // Download file
       XLSX.writeFile(wb, fileName)
@@ -225,7 +225,7 @@ export function EstimateManagement() {
                       {estimate.items.length} item{estimate.items.length !== 1 ? 's' : ''}
                     </TableCell>
                     <TableCell className="font-semibold text-slate-900 dark:text-white">
-                      ${calculateTotal(estimate.items).toLocaleString()}
+                      ₹{calculateTotal(estimate.items).toLocaleString()}
                     </TableCell>
                     <TableCell className="text-slate-600 dark:text-slate-300 text-sm">
                       {formatDate(estimate.createdAt)}
@@ -277,7 +277,7 @@ export function EstimateManagement() {
                                           {item.productId?.category || 'Unknown Category'} • Qty: {item.quantity}
                                         </p>
                                       </div>
-                                      <p className="font-semibold">${item.price.toLocaleString()}</p>
+                                      <p className="font-semibold">₹{item.price.toLocaleString()}</p>
                                     </div>
                                   ))}
                                 </div>
@@ -286,7 +286,7 @@ export function EstimateManagement() {
                                 <div className="flex justify-between items-center">
                                   <p className="text-sm text-slate-500 dark:text-slate-400">Total Amount</p>
                                   <p className="font-bold text-lg text-blue-600">
-                                    ${calculateTotal(estimate.items).toLocaleString()}
+                                    ₹{calculateTotal(estimate.items).toLocaleString()}
                                   </p>
                                 </div>
                               </div>

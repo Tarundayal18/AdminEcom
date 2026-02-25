@@ -31,7 +31,9 @@ interface Product {
   name: string
   category: string
   price: number
+  totalPrice: number
   quantity: number
+  moq?: number
   description?: string
   productCode?: string
   status: "active" | "inactive"
@@ -39,18 +41,8 @@ interface Product {
 }
 
 export function ProductManagement() {
-  const [categories, setCategories] = useState<string[]>([
-    "electronics",
-    "clothing",
-    "food",
-    "furniture",
-    "books",
-    "toys",
-    "sports",
-    "beauty",
-    "automotive",
-    "health"
-  ])
+  const [categories, setCategories] = useState<string[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(false)
   
   const [products, setProducts] = useState<Product[]>([])
   const [deactivatedProducts, setDeactivatedProducts] = useState<Product[]>([])
@@ -62,7 +54,9 @@ export function ProductManagement() {
     name: "", 
     category: "",
     price: "",
+    totalPrice: "",
     quantity: "",
+    moq: "",
     description: "",
     productCode: ""
   })
@@ -74,6 +68,47 @@ export function ProductManagement() {
   const [newCategory, setNewCategory] = useState("")
   const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
 
+  // Fetch categories from API
+  const fetchCategories = async () => {
+    try {
+      setLoadingCategories(true)
+      const response = await api.get('/categories')
+      console.log('=== CATEGORIES API RESPONSE ===')
+      console.log('Categories data:', response.data)
+      console.log('==============================')
+      
+      // Handle different response formats
+      if (response.data.data && Array.isArray(response.data.data)) {
+        // Array of categories
+        const uniqueCategories = [...new Set(response.data.data.map((cat: any) => String(cat.name || cat)))] as string[]
+        setCategories(uniqueCategories)
+      } else if (response.data.category) {
+        // Single category - convert to array
+        console.log('=== SINGLE CATEGORY RESPONSE ===')
+        console.log('response.data.category:', response.data.category)
+        console.log('Setting categories to:', [String(response.data.category)])
+        console.log('================================')
+        setCategories([String(response.data.category)])
+      } else {
+        // Fallback: extract from existing products
+        const allProducts = [...products, ...deactivatedProducts]
+        const uniqueCategories = [...new Set(allProducts.map((p: any) => p.category).filter(Boolean))] as string[]
+        setCategories(uniqueCategories)
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+      // Fallback to basic categories
+     
+    } finally {
+      setLoadingCategories(false)
+    }
+  }
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
   // Fetch products from API
   const fetchProducts = async () => {
     try {
@@ -82,23 +117,35 @@ export function ProductManagement() {
       console.log('=== PRODUCTS API RESPONSE ===')
       console.log('Response data:', response.data)
       console.log('Products array:', response.data.data)
+      console.log('Full first product:', JSON.stringify(response.data.data[0], null, 2))
       console.log('============================')
       
       const productsData = response.data.data.map((product: any) => {
         console.log('Processing product:', product)
-        return {
+        console.log('API product.totalPrice:', product.totalPrice)
+        console.log('API product.price:', product.price)
+        const mappedProduct = {
           id: product._id,
           name: product.name,
           category: product.category,
           price: product.price,
+          totalPrice: product.totalPrice || product.price, // Use price as totalPrice when API doesn't send totalPrice
           quantity: product.quantity,
+          moq: product.moq || 0,
           description: product.description || "",
           productCode: product.productCode || "",
           status: product.isActive ? "active" : "inactive" as "active" | "inactive",
           image: product.mainImage?.url || product.image || product.imageUrl || null
         }
+        console.log('Mapped product.totalPrice:', mappedProduct.totalPrice)
+        console.log('Mapped product.price:', mappedProduct.price)
+        return mappedProduct
       })
       setProducts(productsData)
+      
+      // Update categories from products if no dedicated categories endpoint
+      const uniqueCategories = [...new Set(productsData.map((p: Product) => p.category).filter(Boolean))] as string[]
+      setCategories(prev => prev.length === 0 ? uniqueCategories : prev)
     } catch (error) {
       console.error('Error fetching products:', error)
       toast.error('Failed to fetch products')
@@ -116,13 +163,19 @@ export function ProductManagement() {
         name: product.name,
         category: product.category,
         price: product.price,
+        totalPrice: product.totalPrice || product.price, // Use price as totalPrice when API doesn't send totalPrice
         quantity: product.quantity,
+        moq: product.moq || 0,
         description: product.description || "",
         productCode: product.productCode || "",
         status: "inactive" as "active" | "inactive",
         image: product.mainImage?.url || product.image || product.imageUrl || null
       }))
       setDeactivatedProducts(deactivatedData)
+      
+      // Update categories from deactivated products
+      const uniqueCategories = [...new Set(deactivatedData.map((p: any) => p.category).filter(Boolean))] as string[]
+      setCategories(prev => prev.length === 0 ? uniqueCategories : prev)
     } catch (error) {
       console.error('Error fetching deactivated products:', error)
       toast.error('Failed to fetch deactivated products')
@@ -150,6 +203,25 @@ export function ProductManagement() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation checks
+    if (!formData.name || !formData.name.trim()) {
+      toast.error('Product name is required')
+      return
+    }
+    if (!formData.category || !formData.category.trim()) {
+      toast.error('Category is required')
+      return
+    }
+    if (!formData.price || isNaN(Number.parseFloat(formData.price))) {
+      toast.error('Valid price is required')
+      return
+    }
+    if (!formData.quantity || isNaN(Number.parseInt(formData.quantity))) {
+      toast.error('Valid quantity is required')
+      return
+    }
+    
     setConfirmDialog({
       open: true,
       type: editingId ? "edit" : "add",
@@ -173,7 +245,9 @@ export function ProductManagement() {
             // Use FormData when image is being updated
             const formDataToSend = new FormData()
             formDataToSend.append('price', formData.price)
+            formDataToSend.append('totalPrice', formData.totalPrice || formData.price)
             formDataToSend.append('quantity', formData.quantity)
+            formDataToSend.append('moq', formData.moq || '0')
             formDataToSend.append('description', formData.description || '')
             formDataToSend.append('category', formData.category.trim()) // Added category update
             formDataToSend.append('productCode', formData.productCode.trim()) // Added productCode field
@@ -200,7 +274,9 @@ export function ProductManagement() {
                   ? { 
                       ...p, 
                       price: Number.parseFloat(formData.price),
+                      totalPrice: Number.parseFloat(formData.totalPrice || formData.price),
                       quantity: Number.parseInt(formData.quantity),
+                      moq: Number.parseInt(formData.moq) || 0,
                       description: formData.description,
                       category: formData.category.trim(), // Added category update
                       productCode: formData.productCode.trim(), // Added productCode field
@@ -211,10 +287,12 @@ export function ProductManagement() {
             )
             toast.success("Product updated successfully with new image")
           } else {
-            // Update without image - only send price, quantity, description, category, productCode
+            // Update without image - only send price, quantity, description, category, productproductCode
             const updatedProduct = {
               price: Number.parseFloat(formData.price),
+              totalPrice: Number.parseFloat(formData.totalPrice || formData.price),
               quantity: Number.parseInt(formData.quantity),
+              moq: Number.parseInt(formData.moq) || 0,
               description: formData.description,
               category: formData.category.trim(), // Added category update
               productCode: formData.productCode.trim(), // Added productCode field
@@ -237,38 +315,15 @@ export function ProductManagement() {
           setEditingId(null)
         } else {
           // Add new product
-          console.log('=== FORM DATA VALIDATION ===')
-          console.log('name:', formData.name)
-          console.log('category:', formData.category)
-          console.log('price:', formData.price)
-          console.log('quantity:', formData.quantity)
-          console.log('selectedImage:', selectedImage)
-          
-          // Validate all required fields
-          if (!formData.name || !formData.name.trim()) {
-            toast.error('Product name is required')
-            return
-          }
-          if (!formData.category || !formData.category.trim()) {
-            toast.error('Category is required')
-            return
-          }
-          if (!formData.price || isNaN(Number.parseFloat(formData.price))) {
-            toast.error('Valid price is required')
-            return
-          }
-          if (!formData.quantity || isNaN(Number.parseInt(formData.quantity))) {
-            toast.error('Valid quantity is required')
-            return
-          }
-          
           if (selectedImage) {
             // Use FormData when image is present
             const formDataToSend = new FormData()
             formDataToSend.append('name', formData.name.trim())
             formDataToSend.append('category', formData.category.trim())
             formDataToSend.append('price', formData.price)
+            formDataToSend.append('totalPrice', formData.totalPrice || formData.price)
             formDataToSend.append('quantity', formData.quantity)
+            formDataToSend.append('moq', formData.moq || '0')
             formDataToSend.append('description', formData.description || '')
             formDataToSend.append('productCode', formData.productCode.trim()) // Added productCode field
             formDataToSend.append('mainImage', selectedImage)
@@ -293,10 +348,19 @@ export function ProductManagement() {
               name: formData.name,
               category: formData.category,
               price: Number.parseFloat(formData.price),
+              totalPrice: Number.parseFloat(formData.totalPrice || formData.price),
               quantity: Number.parseInt(formData.quantity),
+              moq: Number.parseInt(formData.moq) || 0,
               status: "active",
               image: response.data.mainImage?.url || response.data.image || null
             }
+            
+            console.log('=== PRODUCT WITH TOTAL PRICE ===')
+            console.log('formData.totalPrice:', formData.totalPrice)
+            console.log('formData.price:', formData.price)
+            console.log('productWithId.totalPrice:', productWithId.totalPrice)
+            console.log('productWithId.price:', productWithId.price)
+            console.log('================================')
             
             setProducts([...products, productWithId])
             toast.success("Product added successfully with image")
@@ -306,7 +370,9 @@ export function ProductManagement() {
               name: formData.name.trim(),
               category: formData.category.trim(),
               price: Number.parseFloat(formData.price),
+              totalPrice: Number.parseFloat(formData.totalPrice || formData.price),
               quantity: Number.parseInt(formData.quantity),
+              moq: Number.parseInt(formData.moq) || 0,
               description: formData.description || '',
               productCode: formData.productCode.trim(), // Added productCode field
             }
@@ -403,15 +469,28 @@ export function ProductManagement() {
   // }
 
   const editProduct = (product: Product) => {
+    console.log('=== EDIT PRODUCT CALLED ===')
+    console.log('Product from API:', product)
+    console.log('product.totalPrice:', product.totalPrice)
+    console.log('product.price:', product.price)
+    
     setEditingId(product.id)
-    setFormData({
+    const formDataToSet = {
       name: product.name,
       category: product.category,
       price: product.price.toString(),
+      totalPrice: (product.totalPrice || product.price).toString(),
       quantity: product.quantity.toString(),
+      moq: (product.moq || 0).toString(),
       description: product.description || "",
       productCode: product.productCode || ""
-    })
+    }
+    
+    console.log('formDataToSet.totalPrice:', formDataToSet.totalPrice)
+    console.log('formDataToSet.price:', formDataToSet.price)
+    console.log('===========================')
+    
+    setFormData(formDataToSet)
     setImagePreview(product.image || null)
     setSelectedImage(null)
     setIsDialogOpen(true)
@@ -436,7 +515,7 @@ export function ProductManagement() {
 
   const handleAddNewCategory = () => {
     if (newCategory.trim()) {
-      const trimmedCategory = newCategory.trim().toLowerCase()
+      const trimmedCategory = newCategory.trim()
       if (!categories.includes(trimmedCategory)) {
         setCategories([...categories, trimmedCategory])
         setFormData({ ...formData, category: trimmedCategory })
@@ -476,7 +555,9 @@ export function ProductManagement() {
               name: "", 
               category: "",
               price: "",
+              totalPrice: "",
               quantity: "",
+              moq: "",
               description: "",
               productCode: ""
             })
@@ -490,7 +571,9 @@ export function ProductManagement() {
                 name: "", 
                 category: "",
                 price: "",
+                totalPrice: "",
                 quantity: "",
+                moq: "",
                 description: "",
                 productCode: ""
               })
@@ -507,14 +590,14 @@ export function ProductManagement() {
               </Button>
             </DialogTrigger>
           )}
-          <DialogContent className="dark:bg-slate-900 dark:border-slate-800">
+          <DialogContent className="dark:bg-slate-900 dark:border-slate-800 max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>{editingId ? "Edit Product" : "Add New Product"}</DialogTitle>
               <DialogDescription>
                 {editingId ? "Update product details" : "Add a new product to your catalog"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 p-2">
               <div>
                 <label className="text-sm font-medium">Product Name</label>
                 <Input
@@ -540,6 +623,17 @@ export function ProductManagement() {
                   placeholder="Enter product productCode"
                   value={formData.productCode}
                   onChange={(e) => setFormData({ ...formData, productCode: e.target.value })}
+                  className="dark:bg-slate-800 dark:border-slate-700"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">MOQ (Minimum Order Quantity)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={formData.moq}
+                  onChange={(e) => setFormData({ ...formData, moq: e.target.value })}
                   className="dark:bg-slate-800 dark:border-slate-700"
                 />
               </div>
@@ -621,9 +715,10 @@ export function ProductManagement() {
                     value={formData.category}
                     onValueChange={handleCategoryChange}
                     required
+                    disabled={loadingCategories}
                   >
                     <SelectTrigger className="dark:bg-slate-800 dark:border-slate-700">
-                      <SelectValue placeholder="Select a category" />
+                      <SelectValue placeholder={loadingCategories ? "Loading categories..." : "Select a category"} />
                     </SelectTrigger>
                     <SelectContent>
                       {categories.map((category) => (
@@ -640,7 +735,7 @@ export function ProductManagement() {
                 )}
               </div>
               <div>
-                <label className="text-sm font-medium">Price ($)</label>
+                <label className="text-sm font-medium">Price (₹)</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -731,9 +826,11 @@ export function ProductManagement() {
                 <TableHead>Image</TableHead>
                 <TableHead>Product Name</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Code</TableHead>
+                <TableHead>productCode</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead>TotalPrice</TableHead>
                 <TableHead>Quantity</TableHead>
+                <TableHead>MOQ</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -766,9 +863,12 @@ export function ProductManagement() {
                     <Badge variant="outline" className="dark:border-slate-600">
                       {product.productCode || "-"}
                     </Badge>
-                  </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">${product.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">{product.quantity}</TableCell>
+                  </TableCell>  
+                  <TableCell className="text-slate-600 dark:text-slate-300">₹{(product.price || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-slate-600 dark:text-slate-300">₹{(product.totalPrice || 0).toFixed(2)}</TableCell>
+
+                    <TableCell className="text-slate-600 dark:text-slate-300">{product.quantity}</TableCell>
+                  <TableCell className="text-slate-600 dark:text-slate-300">{product.moq || 0}</TableCell>
                   <TableCell>
                     <Badge
                       className={
@@ -825,7 +925,7 @@ export function ProductManagement() {
           })
         }
         title="Add Product?"
-        description={`Are you sure you want to add "${formData.name}" to your product catalog?`}
+        description={`Add "${formData.name}" (${formData.category}) - ₹${formData.price} to your product catalog?`}
         actionLabel="Add Product"
         onConfirm={handleConfirmAction}
       />
@@ -839,7 +939,7 @@ export function ProductManagement() {
           })
         }
         title="Update Product?"
-        description={`Are you sure you want to update "${formData.name}"?`}
+        description={`Update "${formData.name}" with new details?`}
         actionLabel="Update"
         onConfirm={handleConfirmAction}
       />
