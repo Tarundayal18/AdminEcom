@@ -113,7 +113,7 @@ export function ProductManagement() {
   const fetchProducts = async () => {
     try {
       setLoading(true)
-      const response = await api.get('/products')
+      const response = await api.get('/products?limit=1000') // Fetch all products
       console.log('=== PRODUCTS API RESPONSE ===')
       console.log('Response data:', response.data)
       console.log('Products array:', response.data.data)
@@ -157,7 +157,7 @@ export function ProductManagement() {
   // Fetch deactivated products for admin
   const fetchDeactivatedProducts = async () => {
     try {
-      const response = await api.get('/admin/products/deactivated')
+      const response = await api.get('/admin/products/deactivated?limit=1000') // Fetch all deactivated products
       const deactivatedData = response.data.data.map((product: any) => ({
         id: product._id,
         name: product.name,
@@ -819,8 +819,91 @@ export function ProductManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
-          <Table>
+        <CardContent className="p-0">
+          {/* Mobile Card View */}
+          <div className="block lg:hidden">
+            <div className="divide-y divide-gray-200 dark:divide-slate-700">
+              {filteredProducts.map((product) => (
+                <div key={product.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {product.name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {product.category}
+                      </p>
+                    </div>
+                    <div className="ml-4 flex-shrink-0">
+                      {product.image ? (
+                        <img 
+                          src={product.image} 
+                          alt={product.name}
+                          className="h-12 w-12 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-gray-200 dark:bg-slate-700 flex items-center justify-center">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">No img</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Price:</span>
+                      <span className="ml-1 font-medium">₹{(product.totalPrice || product.price || 0).toFixed(2)}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Qty:</span>
+                      <span className="ml-1 font-medium">{product.quantity}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">MOQ:</span>
+                      <span className="ml-1 font-medium">{product.moq || 0}</span>
+                    </div>
+                    <div>
+                      <Badge
+                        className={
+                          product.status === "active"
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            : "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200"
+                        }
+                      >
+                        {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Code: {product.productCode || "-"}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => editProduct(product)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteProduct(product.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto">
+            <Table>
             <TableHeader>
               <TableRow className="dark:border-slate-800">
                 <TableHead>Image</TableHead>
@@ -913,6 +996,7 @@ export function ProductManagement() {
               ))}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
