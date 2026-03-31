@@ -50,6 +50,7 @@ export function ProductManagement() {
   const [showDeactivated, setShowDeactivated] = useState(false)
 
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [formData, setFormData] = useState({ 
     name: "", 
     category: "",
@@ -197,9 +198,11 @@ export function ProductManagement() {
     type: null,
   })
 
-  const filteredProducts = (showDeactivated ? deactivatedProducts : products).filter((p) => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProducts = (showDeactivated ? deactivatedProducts : products).filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === "all" || p.category === selectedCategory
+    return matchesSearch && matchesCategory
+  })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -810,6 +813,30 @@ export function ProductManagement() {
                   Deactivated Products
                 </Button>
               </div>
+              <Select
+                value={selectedCategory}
+                onValueChange={setSelectedCategory}
+              >
+                <SelectTrigger className="md:w-48 dark:bg-slate-800 dark:border-slate-700">
+                  <SelectValue placeholder="Filter by category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-gradient-to-r from-blue-600 to-cyan-600"></div>
+                      All Categories
+                    </div>
+                  </SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category} value={category}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gradient-to-r from-purple-600 to-pink-600"></div>
+                        {category}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 placeholder="Search products..."
                 value={searchTerm}
