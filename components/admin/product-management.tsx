@@ -934,8 +934,8 @@ export function ProductManagement() {
             <TableHeader>
               <TableRow className="dark:border-slate-800">
                 <TableHead>Image</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead className="w-48">Product Name</TableHead>
+                <TableHead className="w-32">Category</TableHead>
                 <TableHead>productCode</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>TotalPrice</TableHead>
@@ -961,11 +961,18 @@ export function ProductManagement() {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="font-medium text-slate-900 dark:text-white">
-                    <div className="font-semibold">{product.name}</div>
+                  <TableCell className="font-medium text-slate-900 dark:text-white w-48 max-w-48">
+                    <div className="font-semibold text-sm break-words overflow-hidden" style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden'
+                    }}>
+                      {product.name}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-slate-600 dark:text-slate-300">
-                    <Badge variant="outline" className="dark:border-slate-600">
+                  <TableCell className="text-slate-600 dark:text-slate-300 w-32">
+                    <Badge variant="outline" className="dark:border-slate-600 whitespace-nowrap">
                       {product.category}
                     </Badge>
                   </TableCell>
